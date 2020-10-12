@@ -1,0 +1,176 @@
+---
+title: "Lab_4"
+author: "Heather M"
+date: "10/7/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r}
+library(readxl)
+library(dplyr)
+library(tidyverse)
+library(ggplot2)
+defense <- read_excel('cyclonesFootball2019.xlsx' ,sheet = 'Defensive')
+offense <- read_excel("cyclonesFootball2019.xlsx", sheet = 'Offensive')
+biography <- read_excel("cyclonesFootball2019.xlsx", sheet = 'Biography')
+
+```
+
+
+Part one: Cleaning data
+Although the three Excel sheets are loaded into R, they are not useful before some cleaning. Manipulate the three imported data frames, so that in the cleaned dataset:
+1.) The player names and opponent names are factors.
+```{r}
+defClean <- defense
+Opponents <- defense$Opponent_Opponent
+players <- defense$Name
+teams <-factor(c(Opponents))
+player <- factor(c(players))
+defClean['Name'] <- player
+defClean['Opponent_Opponent'] <- teams
+```
+2.) All offensive and defensive statistics are numerical. The Weight column in biography is also numeric. (Optional: Learn to mutate multiple columns systematically using the ?across function in `dplyr)
+```{r}
+
+OffClean <- offense
+
+def_a <- subset(defense,select = c('Tackles_Solo', 'Tackles_ASST', 'Tackles_Sack', 'Tackles_TFL','Turnover_FF', 'Turnover_FR', 'Turnover_INT', 'Pass_QBH', 'Pass_PB' ))
+
+def_b <-subset(defense, select = c('Name', 'Opponent_Opponent'))
+ 
+
+off_a <- subset(OffClean, select = c('Rushing_ATT', 'Rushing_YDS', 'Rushing_TD', 'Receiving_REC', 'Receiving_YDS', 'Receiving_TD', 'Passing_CMP-ATT', 'Passing_YDS', 'Passing_TD', 'Passing_INT'))
+
+off_b <- subset(offense, select = c('Name', 'Opponent_Opponent'))
+
+ 
+defClean <- def_a %>% mutate_if(is.character, as.numeric)
+
+OffClean <- off_a %>% mutate_if(is.character, as.numeric)
+
+defClean$Name <- def_b$Name
+defClean$Opponent <- def_b$Opponent_Opponent
+
+OffClean$Name <- off_b$Name
+OffClean$opponent <- off_b$Opponent_Opponent
+
+BioClean <- biography                                        
+BioClean['Weight'] <- as.numeric(c(BioClean$Weight))
+```
+
+3.)Change the Height column in biography into numeric. (Hint: Use a unit that works well
+```{r}
+BioClean <- biography %>% separate(Height, c('Feet', 'Inches'), sep = '-')
+
+BioClean['Feet'] <- as.numeric(c(BioClean$Feet))
+BioClean['Feet'] <- BioClean['Feet']*12
+
+BioClean['Inches'] <- as.numeric(c(BioClean$Inches))          
+
+Height <- BioClean['Feet'] + BioClean['Inches']
+BioClean <- subset(BioClean, select = -c(Inches , Feet))
+```
+
+
+
+#By cleaning the three data frames in R, at the end of this step you should have the following three clean data frames: defClean, offClean, and bioClean. Print the structures of these data frames.
+```{r}
+str(defClean)
+```
+```{r}
+str(OffClean)
+```
+```{r}
+str(BioClean)
+```
+
+***Part 2***
+
+For the following questions, work on the cleaned data frames defClean, offClean, and bioClean.
+
+1.)Reformat the defClean data frame into a tidy format using pivot_longer. The type of statistic (Tackles_Solo, Tackles_ASST, etc) is added as a new key column named stat.
+```{r}
+defClean_a <- defClean %>% pivot_longer(cols = starts_with('Tackles'),names_to = 'Tackles_Stats', values_to = 'count')
+
+```
+
+2.)Compare the distributions of the defensive statistics. What defensive skills are rare?
+```{r}
+defClean_a['Tackle_Stats'] <-  as.numeric(defClean_a$Tackles_Stats)
+ggplot(defClean_a, aes(x=Tackles_Stats, y=count)) + geom_line(color='red')
+```
+ Based the visual representation above, it appears, from Tackle statistics, the most rare skill are sacks. 
+ 
+3.)Did ISU have better defense against Iowa or Notre Dame? Answer this question by creating a scatterplot with x- and y-axes being the number of solo tackles (of each player). A large number of solo tackles is an indicator of good defense.
+```{r}
+defClean_b <- defClean %>% subset(Opponent == 'Iowa')
+defClean_c <- defClean %>% subset(Opponent == 'Notre Dame')
+ggplot(defClean_b, aes(x=Tackles_Solo, y=Name), width = 650) + geom_point(color='gold')
+```
+```{r}
+ggplot(defClean_c, aes(x=Tackles_Solo, y=Name), width = 650) + geom_point(color='red')
+```
+ Based on the graph above, it looks like the tackles were better in the Notre Dame game. Therefore the defense was better during that game instead of the Iowa football game.
+Now turn our attention to the player biography.
+
+4.) Separate the Hometown column into two columns, namely the city and the state. Print the first few rows of these two columns. (Hint: look at the sep= argument of separate)
+```{r}
+BioClean <- BioClean %>% separate('Hometown', c('City', 'State'), sep = ',')
+head(BioClean)
+```
+
+5.)How many players are there from each state?
+```{r}
+ggplot(BioClean, aes(x=State,), width = 225) + geom_bar(color = 'pink', fill = 'gold') 
+```
+# To answer this question, we can refer to the graph above. Marjority of the states have less than 5 players that are from there. In between 5-10 players are Florida, Iowa, Missouri, Ohio, Texas and Wisconsin.Lastly, the state that has the most players from it , by an overwheling margin, is Iowa. 
+
+**Part 3**
+
+1.Find which states do the ISU defensive and offensive players come from. Create an appropriate summary.
+```{r}
+#Defensive Players
+Def_Bio <- left_join(defClean,BioClean, by = 'Name')
+ggplot(Def_Bio, aes(x=State), width = 225) + geom_bar(fill = 'red')
+# Add to analysis, its not a good representation because the Brock is inconsistent but when you have a whole team it evens things out. 
+```
+Defensive Response: According the graph, it appears that most of the defensive players come from Iowa, Florida, Georgia, and Ohio.
+```{r}
+Off_Bio <- left_join(OffClean,BioClean, by = 'Name')
+ggplot(Off_Bio, aes(x=State), width = 225) + geom_bar(fill = 'gold')
+```
+Offensive Response: In this graph, we have the information regarding the players on offense and where they are from. By investigating the graph, we can see that most of these players are from Florida, Oklahoma, and there appears to be a bit of a tie between Arizona, Georgia, Iowa, Missouri, and Texas. 
+
+2. How does the performance of quarterback Brock Purdy relate to the performance of the ISU team?
+```{r}
+Purdy <- Off_Bio %>% subset(Name == 'Purdy, Brock')
+ggplot(OffClean, aes(x = Rushing_YDS,y = opponent), width = 250) + geom_col(fill = 'red')
+```
+```{r}
+ggplot(Purdy, aes(x = Rushing_YDS,y = opponent), width = 250) + geom_col(fill = 'gold')
+```
+Analysis: The to graphs above show the comparison of rushing yards for the teams as well as Brock Purdy. In the gold graph, which shows Purdy's individual performance, it shows that he was very inconsistent with his game play last season. There was a strong fluctuation between his good and bad games. However, when looking at the graph in red, the team's stats, there is less variation and a bit more consistency in the amount of rushing yards. In summary, this displays that  Purdy's performances doesn't necessarily have affect on the team as a whole. It could be a factor in performance but it isn't the overarching factor that affects everyone. 
+
+3. Which ISU player(s) made big progress over the last year? Compare the 2019 and the 2018 data here.
+```{r}
+defense_2018 <- read_excel('cyclonesFootball2018.xlsx' ,sheet = 'Defensive')
+offense_2018 <- read_excel("cyclonesFootball2018.xlsx", sheet = 'Offensive')
+biography_2018 <- read_excel('cyclonesFootball2018.xlsx', sheet = 'Biography')
+
+Mcdonald_2019 <- defClean %>% subset(c(Name == 'McDonald, Will'))
+Mcdonald_2018 <- defense_2018 %>% subset(c(Name == 'McDonald, Will'))
+
+
+Mcdonald_2018['Tackles_Solo'] <- as.numeric(c(Mcdonald_2018$Tackles_Solo))
+Mcdonald_2019['Tackles_Solo'] <- as.numeric(c(Mcdonald_2019$Tackles_Solo))
+
+ggplot(Mcdonald_2018,aes(x=Tackles_Solo, y=Opponent_Opponent, width = 350)) + geom_point(color='red')
+```
+```{r}
+ggplot(Mcdonald_2019,aes(x=Tackles_Solo, y=Opponent, width = 350)) + geom_point(color='gold')
+```
+ When approaching this question, I did reach out to outside resources to get a better idea of who the returners are for the 2019 season. I decided to focus on the defense side and the player I choose to look at was Will McDonald. He was freshman in 2018 and played very little during that season(seen in the red graph). Moving into his sophomore season he increase his game play from 4 games to playing in all of the games for the seasons. In more than half of the games, he was able to complete at least one solo tackle in more than half of the games in the 2019 season. Therefore, I believe that Will McDonald has seen some of the best progress from 2018 to 2019. 
+
